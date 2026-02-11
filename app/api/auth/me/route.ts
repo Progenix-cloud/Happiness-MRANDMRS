@@ -10,16 +10,26 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB()
 
-    // Get token from Authorization header
+    // Get token from Authorization header OR auth_token cookie
+    let token: string | null = null
+    
     const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7)
+    } else {
+      // Try to get token from auth_token cookie
+      const cookieToken = request.cookies.get('auth_token')
+      if (cookieToken) {
+        token = cookieToken.value
+      }
+    }
+
+    if (!token) {
       return NextResponse.json(
         { error: 'Unauthorized - Missing or invalid token' },
         { status: 401 }
       )
     }
-
-    const token = authHeader.substring(7)
 
     // Verify JWT
     const payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }
@@ -60,16 +70,26 @@ export async function PUT(request: NextRequest) {
   try {
     await connectDB()
 
-    // Get token from Authorization header
+    // Get token from Authorization header OR auth_token cookie
+    let token: string | null = null
+    
     const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7)
+    } else {
+      // Try to get token from auth_token cookie
+      const cookieToken = request.cookies.get('auth_token')
+      if (cookieToken) {
+        token = cookieToken.value
+      }
+    }
+
+    if (!token) {
       return NextResponse.json(
         { error: 'Unauthorized - Missing or invalid token' },
         { status: 401 }
       )
     }
-
-    const token = authHeader.substring(7)
 
     // Verify JWT
     const payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }

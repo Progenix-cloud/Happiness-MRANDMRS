@@ -73,7 +73,19 @@ export async function POST(request: NextRequest) {
 
     const { password: _, ...userWithoutPassword } = user.toObject()
 
-    return NextResponse.json({ user: userWithoutPassword, token })
+    // Create response with token in HttpOnly cookie AND in response body
+    const response = NextResponse.json({ user: userWithoutPassword, token })
+    
+    // Set HttpOnly cookie for future requests (7 days)
+    response.cookies.set('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      path: '/',
+    })
+
+    return response
   } catch (error) {
     console.error('Google auth error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

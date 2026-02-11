@@ -48,7 +48,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
+      // Check for token in localStorage (from Google OAuth)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+      
+      const headers: Record<string, string> = {}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
       const response = await fetch('/api/auth/me', {
+        headers: headers.Authorization ? headers : undefined,
         credentials: 'include',
       })
       if (response.ok) {
@@ -57,6 +66,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ...userData,
           id: userData._id || userData.id,
         })
+        
+        // If we had a localStorage token, set it as a cookie for future requests
+        if (token) {
+          // The auth_token cookie should be set by the server on login/google endpoints
+          // But as a fallback, we ensure localStorage stays in sync
+        }
+      } else {
+        // Clear invalid token from localStorage
+        if (token) {
+          localStorage.removeItem('auth_token')
+        }
       }
     } catch (error) {
       console.error('Auth check failed:', error)

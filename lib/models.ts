@@ -4,6 +4,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose'
 export interface IUser extends Document {
   email: string
   name: string
+  slug?: string
   phone?: string
   password: string
   roles: string[]
@@ -105,10 +106,22 @@ export interface IView extends Document {
   createdAt: Date
 }
 
+// Session Interface
+export interface ISession extends Document {
+  sessionId: string
+  userId: mongoose.Types.ObjectId
+  userAgent?: string
+  ipAddress?: string
+  createdAt: Date
+  lastSeen?: Date
+  expiresAt: Date
+}
+
 // User Schema
 const UserSchema = new Schema<IUser>({
   email: { type: String, required: true, unique: true, lowercase: true },
   name: { type: String, required: true },
+  slug: { type: String, required: false, index: true },
   phone: { type: String },
   password: { type: String, required: true },
   roles: { type: [String], default: ['participant'] },
@@ -119,6 +132,21 @@ const UserSchema = new Schema<IUser>({
   profileImage: { type: String },
   bio: { type: String },
 }, { timestamps: true })
+
+// Auto-generate slug from name if not present
+function slugifyName(name: string) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+UserSchema.pre('save', function (next) {
+  if (!this.slug && this.name) {
+    this.slug = slugifyName(this.name)
+  }
+  next()
+})
 
 // OTP Schema
 const OTPSchema = new Schema<IOTP>({
@@ -197,13 +225,24 @@ const ViewSchema = new Schema<IView>({
   userAgent: { type: String },
 }, { timestamps: true })
 
+// Session Schema
+const SessionSchema = new Schema<ISession>({
+  sessionId: { type: String, required: true, unique: true, index: true },
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  userAgent: { type: String },
+  ipAddress: { type: String },
+  lastSeen: { type: Date },
+  expiresAt: { type: Date, required: true },
+}, { timestamps: true })
+
 // Indexes
-UserSchema.index({ email: 1 })
+// Note: fields declared with `unique: true` on the schema already create indexes.
+// Avoid declaring duplicate indexes to prevent Mongoose warnings.
 UserSchema.index({ category: 1 })
 UserSchema.index({ registrationStatus: 1 })
 OTPSchema.index({ email: 1, otp: 1 })
 OTPSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
-PaymentSchema.index({ razorpayOrderId: 1 })
+// razorpayOrderId is declared `unique: true` on the schema; avoid duplicate index
 PaymentSchema.index({ razorpayPaymentId: 1 })
 PaymentSchema.index({ userId: 1 })
 HappinessEntrySchema.index({ userId: 1 })
@@ -211,12 +250,15 @@ HappinessEntrySchema.index({ date: 1 })
 HappinessEntrySchema.index({ verified: 1 })
 MediaSchema.index({ userId: 1 })
 MediaSchema.index({ verified: 1 })
-RegistrationSchema.index({ userId: 1 })
+// `userId` is declared `unique: true` on the schema; avoid duplicate index
 RegistrationSchema.index({ status: 1 })
 VoteSchema.index({ userId: 1, resourceType: 1, resourceId: 1 }, { unique: true })
 VoteSchema.index({ resourceType: 1, resourceId: 1 })
 ViewSchema.index({ resourceType: 1, resourceId: 1 })
 ViewSchema.index({ createdAt: -1 })
+
+// SessionSchema.index({ sessionId: 1 }) -- already unique: true on schema
+SessionSchema.index({ userId: 1 })
 
 // Models
 export const User: Model<IUser> = mongoose.models.User || mongoose.model<IUser>('User', UserSchema)
@@ -227,4 +269,5 @@ export const Media: Model<IMedia> = mongoose.models.Media || mongoose.model<IMed
 export const Registration: Model<IRegistration> = mongoose.models.Registration || mongoose.model<IRegistration>('Registration', RegistrationSchema)
 export const Vote: Model<IVote> = mongoose.models.Vote || mongoose.model<IVote>('Vote', VoteSchema)
 export const View: Model<IView> = mongoose.models.View || mongoose.model<IView>('View', ViewSchema)
+export const Session: Model<ISession> = mongoose.models.Session || mongoose.model<ISession>('Session', SessionSchema)
 

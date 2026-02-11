@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import jwt from 'jsonwebtoken'
 import connectDB from '@/lib/mongodb'
 import { Vote } from '@/lib/models'
+import { getUserIdFromRequest, ensureSecret } from '@/lib/auth'
 
-const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || ''
+const RESOURCE_TYPE_VALUES = ['contestant', 'entry'] as const
+const RESOURCE_ID_RE = /^[A-Za-z0-9_-]{1,100}$/
 
 // GET /api/votes - Get votes for a resource
 export async function GET(request: NextRequest) {
   try {
+    ensureSecret()
     await connectDB()
 
     const { searchParams } = new URL(request.url)
@@ -21,29 +23,30 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    if (!RESOURCE_TYPE_VALUES.includes(resourceType as any)) {
+      return NextResponse.json({ error: 'Invalid resourceType' }, { status: 400 })
+    }
+
+    if (!RESOURCE_ID_RE.test(resourceId)) {
+      return NextResponse.json({ error: 'Invalid resourceId format' }, { status: 400 })
+    }
+
     // Get vote count
     const voteCount = await Vote.countDocuments({
       resourceType,
       resourceId,
     })
 
-    // Check if current user has voted
-    const authHeader = request.headers.get('authorization')
+    // Check if current user has voted (support cookie-based auth)
     let userHasVoted = false
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7)
-      try {
-        const payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }
-        const existingVote = await Vote.findOne({
-          userId: payload.userId,
-          resourceType,
-          resourceId,
-        })
-        userHasVoted = !!existingVote
-      } catch {
-        // Invalid token, ignore
-      }
+    const currentUserId = await getUserIdFromRequest(request)
+    if (currentUserId) {
+      const existingVote = await Vote.findOne({
+        userId: currentUserId,
+        resourceType,
+        resourceId,
+      })
+      userHasVoted = !!existingVote
     }
 
     return NextResponse.json({
@@ -64,27 +67,38 @@ export async function GET(request: NextRequest) {
 // POST /api/votes - Create a vote
 export async function POST(request: NextRequest) {
   try {
+    ensureSecret()
     await connectDB()
 
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Verify authentication (support cookie-based auth)
+    ensureSecret()
+    const userId = await getUserIdFromRequest(request)
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const token = authHeader.substring(7)
-    const payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }
+    let body: any
+    try {
+      body = await request.json()
+    } catch (err) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
 
-    const { resourceType, resourceId } = await request.json()
+    const { resourceType, resourceId } = body
 
     if (!resourceType || !resourceId) {
       return NextResponse.json(
         { error: 'resourceType and resourceId are required' },
         { status: 400 }
       )
+    }
+
+    if (!RESOURCE_TYPE_VALUES.includes(resourceType)) {
+      return NextResponse.json({ error: 'Invalid resourceType' }, { status: 400 })
+    }
+
+    if (!RESOURCE_ID_RE.test(resourceId)) {
+      return NextResponse.json({ error: 'Invalid resourceId format' }, { status: 400 })
     }
 
     // Check if resourceType is valid
@@ -97,7 +111,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user already voted
     const existingVote = await Vote.findOne({
-      userId: payload.userId,
+      userId,
       resourceType,
       resourceId,
     })
@@ -112,7 +126,7 @@ export async function POST(request: NextRequest) {
         resourceId,
       })
 
-      console.log(`✅ Vote removed: ${payload.userId} from ${resourceType}:${resourceId}`)
+      console.log(`✅ Vote removed: ${userId} from ${resourceType}:${resourceId}`)
 
       return NextResponse.json({
         success: true,
@@ -124,7 +138,7 @@ export async function POST(request: NextRequest) {
 
     // Create new vote
     await Vote.create({
-      userId: payload.userId,
+      userId,
       resourceType,
       resourceId,
     })
@@ -135,7 +149,7 @@ export async function POST(request: NextRequest) {
       resourceId,
     })
 
-    console.log(`✅ Vote added: ${payload.userId} to ${resourceType}:${resourceId}`)
+    console.log(`✅ Vote added: ${userId} to ${resourceType}:${resourceId}`)
 
     return NextResponse.json({
       success: true,
@@ -144,12 +158,6 @@ export async function POST(request: NextRequest) {
       userHasVoted: true,
     })
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      )
-    }
     console.error('Create vote error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -161,19 +169,15 @@ export async function POST(request: NextRequest) {
 // DELETE /api/votes - Remove a vote
 export async function DELETE(request: NextRequest) {
   try {
+    ensureSecret()
     await connectDB()
 
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Verify authentication (support cookie-based auth)
+    ensureSecret()
+    const userId = await getUserIdFromRequest(request)
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const token = authHeader.substring(7)
-    const payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }
 
     const { searchParams } = new URL(request.url)
     const resourceType = searchParams.get('resourceType')
@@ -186,9 +190,17 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    if (!RESOURCE_TYPE_VALUES.includes(resourceType as any)) {
+      return NextResponse.json({ error: 'Invalid resourceType' }, { status: 400 })
+    }
+
+    if (!RESOURCE_ID_RE.test(resourceId)) {
+      return NextResponse.json({ error: 'Invalid resourceId format' }, { status: 400 })
+    }
+
     // Find and delete vote
     const vote = await Vote.findOneAndDelete({
-      userId: payload.userId,
+      userId,
       resourceType,
       resourceId,
     })
@@ -200,19 +212,13 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    console.log(`✅ Vote deleted: ${payload.userId} from ${resourceType}:${resourceId}`)
+    console.log(`✅ Vote deleted: ${userId} from ${resourceType}:${resourceId}`)
 
     return NextResponse.json({
       success: true,
       message: 'Vote removed',
     })
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      )
-    }
     console.error('Delete vote error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },

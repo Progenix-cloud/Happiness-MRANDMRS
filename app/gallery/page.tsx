@@ -37,13 +37,7 @@ export default function GalleryPage() {
 
   const fetchContestants = async () => {
     try {
-      const headers: Record<string, string> = {}
-      const token = localStorage.getItem('auth_token')
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-
-      const response = await fetch('/api/contestants', { headers })
+      const response = await fetch('/api/contestants', { credentials: 'include' })
       if (response.ok) {
         const data = await response.json()
         setContestants(data.contestants || [])

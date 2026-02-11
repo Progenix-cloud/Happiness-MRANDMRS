@@ -7,12 +7,27 @@ import { generateOTP, sendOTPEmail } from '@/lib/email'
 
 const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || ''
 
+function ensureSecret() {
+  if (!NEXTAUTH_SECRET) {
+    console.error('NEXTAUTH_SECRET is not set')
+    throw new Error('NEXTAUTH_SECRET is not configured')
+  }
+}
+
 // POST /api/auth/register - Register new user
 export async function POST(request: NextRequest) {
   try {
+    ensureSecret()
     await connectDB()
 
-    const { email, password, name, phone } = await request.json()
+    let body: any
+    try {
+      body = await request.json()
+    } catch (err) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
+
+    const { email, password, name, phone } = body
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -83,21 +98,32 @@ export async function POST(request: NextRequest) {
       verifiedEntriesCount: 0,
     })
 
-    // Generate temporary JWT token
+    // Generate temporary JWT token and set as HttpOnly cookie for verification flow
+    ensureSecret()
     const token = jwt.sign(
       { userId: user._id, email: user.email, step: 'email_verification' },
       NEXTAUTH_SECRET,
       { expiresIn: '1h' }
     )
 
-    console.log(`✅ User registered: ${email}`)
-
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       message: 'Registration successful. Please verify your email.',
-      token,
       requiresVerification: true,
     })
+
+    res.cookies.set({
+      name: 'auth_token',
+      value: token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60, // 1 hour
+    })
+
+    console.log(`✅ User registered: ${email}`)
+    return res
   } catch (error) {
     console.error('Registration error:', error)
     return NextResponse.json(

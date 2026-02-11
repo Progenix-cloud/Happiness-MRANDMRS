@@ -167,3 +167,42 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - [x] No console warnings about mock data
 - [x] All API endpoints return real data
 
+
+---
+
+## Security & Vulnerability Fixes (recent)
+
+- **OTP RNG:** Replaced insecure `Math.random()` OTP generator with `crypto.randomInt()` in `lib/email.ts`.
+- **JWT Storage:** Moved from client `localStorage` tokens to HttpOnly `auth_token` cookie set by `app/api/auth/login` and `app/api/auth/register`. Frontend updated to use `credentials: 'include'` in `lib/auth-context.tsx`, `app/contestants/[slug]/page.tsx`, and `app/gallery/page.tsx`.
+- **S3 Exposure:** Removed `public-read` ACL and switched to presigned URLs using `@aws-sdk/s3-request-presigner` in `lib/s3.ts`.
+- **Centralized Auth:** Added `lib/auth.ts` to centralize extracting `userId` from Authorization header or cookie and used it in API handlers (votes/contestants).
+- **Regex Sanitization:** Escaped user-provided `search` input in `app/api/contestants/route.ts` to reduce ReDoS / injection risk.
+- **Slug Field:** Added `slug` field and auto-generation for `User` in `lib/models.ts` to make slug lookups deterministic.
+- **Logout Endpoint:** Added `POST /api/auth/logout` to clear the HttpOnly cookie.
+- **Session Persistence:** Added persistent `Session` model with 30-day `session_id` cookie to maintain login across browser restarts without Cloudflare Captcha re-prompts. Sessions are auto-cleanup via TTL index.
+- **Rate-Limiting:** Implemented per-route rate-limiting via `middleware.ts` with per-IP tracking:
+  - **OTP Send:** 3 requests/min (strictest)
+  - **OTP Verify:** 5 requests/min
+  - **Login/Register:** 10 requests/min
+  - **Votes:** 30 requests/min
+  - **Logout:** 50 requests/min
+- **CSP & Security Headers:** Added middleware to enforce:
+  - X-Frame-Options: DENY (prevents clickjacking)
+  - X-Content-Type-Options: nosniff (prevents MIME sniffing)
+  - Referrer-Policy: no-referrer (privacy)
+  - Strict-Transport-Security with preload (HSTS)
+  - Content-Security-Policy tuned for Cloudinary, cdn.jsdelivr.net, and WebSocket
+  - Permissions-Policy to disable geolocation and microphone
+
+**Validation Results:**
+- ✅ Security scan confirms all headers present on responses
+- ✅ CSP allows Cloudinary, blocks frame-ancestors, defaults to 'self'
+- ✅ Rate-limiting enforced: 4th OTP request blocked (3 req/min limit)
+- ✅ Cookies are HttpOnly and SameSite=Lax
+- ✅ MongoDB connected; no schema errors
+
+Notes:
+- Additional hardening available (future): Redis-backed rate-limiting for distributed deployments, CSRF tokens on state-changing endpoints, audit logging, intrusion detection.
+- Email sending requires valid SendGrid or SMTP credentials in `.env.local`.
+
+

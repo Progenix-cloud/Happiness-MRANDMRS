@@ -36,7 +36,16 @@ export default function VerifyOTPPage() {
     setIsLoading(true)
 
     try {
-      await login(email, otp)
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, type: 'email_verification' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'OTP verification failed')
+
+      // store token and redirect
+      if (data.token) localStorage.setItem('auth_token', data.token)
       router.push('/dashboard')
     } catch (err) {
       setError('Invalid OTP. Please try again.')

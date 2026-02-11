@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import jwt from 'jsonwebtoken'
 import connectDB from '@/lib/mongodb'
 import { User, HappinessEntry, Media, Vote, View } from '@/lib/models'
-
-const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || ''
+import { getUserIdFromRequest } from '@/lib/auth'
 
 // GET /api/contestants - Get all approved contestants
 export async function GET(request: NextRequest) {
@@ -25,26 +23,18 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
+      // Escape user-provided search to avoid ReDoS / injection
+      const esc = escapeRegex(search)
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { bio: { $regex: search, $options: 'i' } },
+        { name: { $regex: esc, $options: 'i' } },
+        { bio: { $regex: esc, $options: 'i' } },
       ]
     }
 
     const skip = (page - 1) * limit
 
     // Get current user ID (if authenticated)
-    let currentUserId: string | null = null
-    const authHeader = request.headers.get('authorization')
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.substring(7)
-        const payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }
-        currentUserId = payload.userId
-      } catch {
-        // Invalid token, continue without user
-      }
-    }
+    const currentUserId = await getUserIdFromRequest(request)
 
     const [contestants, total] = await Promise.all([
       User.find(query)
@@ -123,5 +113,10 @@ function getCategoryDisplayName(category: string): string {
     'seenagers-gleam': "Seenager's Gleam",
   }
   return categories[category] || category || 'Youth Radiance'
+}
+
+// Simple escape for user input when building regexes
+function escapeRegex(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 

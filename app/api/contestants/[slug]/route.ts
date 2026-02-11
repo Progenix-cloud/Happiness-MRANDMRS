@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import jwt from 'jsonwebtoken'
 import connectDB from '@/lib/mongodb'
 import { User, HappinessEntry, Media, Registration, Vote, View } from '@/lib/models'
-
-const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || ''
+import { getUserIdFromRequest } from '@/lib/auth'
 
 // GET /api/contestants/[slug] - Get single contestant by slug
 export async function GET(
@@ -46,17 +44,7 @@ export async function GET(
     const targetUserIdStr = targetUser._id.toString()
 
     // Get current user ID (if authenticated)
-    let currentUserId: string | null = null
-    const authHeader = request.headers.get('authorization')
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.substring(7)
-        const payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }
-        currentUserId = payload.userId
-      } catch {
-        // Invalid token, continue without user
-      }
-    }
+    const currentUserId = await getUserIdFromRequest(request)
 
     // Track view (for analytics)
     try {
@@ -64,7 +52,7 @@ export async function GET(
         resourceType: 'contestant',
         resourceId: targetUserIdStr,
         userId: currentUserId || undefined,
-        ipAddress: request.headers.get('x-forwarded-for') || undefined,
+        ipAddress: request.headers.get('x-forwarded-for') || request.ip || undefined,
         userAgent: request.headers.get('user-agent') || undefined,
       })
     } catch (error) {

@@ -5,12 +5,27 @@ import { OTP, User } from '@/lib/models'
 
 const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || ''
 
+function ensureSecret() {
+  if (!NEXTAUTH_SECRET) {
+    console.error('NEXTAUTH_SECRET is not set')
+    throw new Error('NEXTAUTH_SECRET is not configured')
+  }
+}
+
 // POST /api/auth/verify-otp - Verify OTP and complete email verification
 export async function POST(request: NextRequest) {
   try {
+    ensureSecret()
     await connectDB()
 
-    const { email, otp, type = 'email_verification' } = await request.json()
+    let body: any
+    try {
+      body = await request.json()
+    } catch (err) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
+
+    const { email, otp, type = 'email_verification' } = body
 
     if (!email || !otp) {
       return NextResponse.json(
@@ -55,6 +70,7 @@ export async function POST(request: NextRequest) {
       // Generate full JWT token
       const user = await User.findOne({ email: email.toLowerCase() })
       if (user) {
+        ensureSecret()
         const token = jwt.sign(
           { userId: user._id, email: user.email, roles: user.roles },
           NEXTAUTH_SECRET,
@@ -74,6 +90,7 @@ export async function POST(request: NextRequest) {
       }
     } else if (type === 'password_reset') {
       // For password reset, return a reset token
+      ensureSecret()
       const resetToken = jwt.sign(
         { email: email.toLowerCase(), type: 'password_reset' },
         NEXTAUTH_SECRET,

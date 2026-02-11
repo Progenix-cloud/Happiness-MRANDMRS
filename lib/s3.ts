@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
+import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { v4 as uuidv4 } from 'uuid'
 
 // AWS S3 Configuration
@@ -77,7 +78,7 @@ export async function uploadToS3(
           Key: key,
           Body: buffer,
           ContentType: file.type,
-          ACL: 'public-read',
+                // Do not make uploads public by default; use signed URLs for access
         },
         queueSize: 4,
       })
@@ -89,16 +90,15 @@ export async function uploadToS3(
         Key: key,
         Body: buffer,
         ContentType: file.type,
-        ACL: 'public-read',
       })
 
       await s3Client.send(command)
     }
+    // Return a presigned URL for secure access
+    const url = await getSignedUrl(key)
 
-    const url = `https://${BUCKET_NAME}.s3.${s3Config.region}.amazonaws.com/${key}`
-
-    console.log(`✅ File uploaded to S3: ${url}`)
-    return { url, key }
+    console.log(`✅ File uploaded to S3: ${key}`)
+    return { url: url || `https://${BUCKET_NAME}.s3.${s3Config.region}.amazonaws.com/${key}`, key }
   } catch (error) {
     console.error('❌ S3 upload error:', error)
     return null
@@ -127,15 +127,14 @@ export async function uploadBase64ToS3(
       Key: key,
       Body: buffer,
       ContentType: mimeType,
-      ACL: 'public-read',
     })
 
     await s3Client.send(command)
 
-    const url = `https://${BUCKET_NAME}.s3.${s3Config.region}.amazonaws.com/${key}`
+    const url = await getSignedUrl(key)
 
-    console.log(`✅ Base64 file uploaded to S3: ${url}`)
-    return { url, key }
+    console.log(`✅ Base64 file uploaded to S3: ${key}`)
+    return { url: url || `https://${BUCKET_NAME}.s3.${s3Config.region}.amazonaws.com/${key}`, key }
   } catch (error) {
     console.error('❌ S3 base64 upload error:', error)
     return null
@@ -167,9 +166,8 @@ export async function getSignedUrl(key: string, expiresIn: number = 3600): Promi
       Key: key,
     })
 
-    // Note: You would use @aws-sdk/s3-request-presigner for signed URLs
-    // For now, return public URL
-    return `https://${BUCKET_NAME}.s3.${s3Config.region}.amazonaws.com/${key}`
+    const url = await awsGetSignedUrl(s3Client, command, { expiresIn })
+    return url
   } catch (error) {
     console.error('❌ S3 signed URL error:', error)
     return null

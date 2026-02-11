@@ -7,9 +7,17 @@ import { uploadToCloudinary, deleteFromCloudinary } from '@/lib/cloudinary'
 
 const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || ''
 
+function ensureSecret() {
+  if (!NEXTAUTH_SECRET) {
+    console.error('NEXTAUTH_SECRET is not set')
+    throw new Error('NEXTAUTH_SECRET is not configured')
+  }
+}
+
 // GET /api/media - Get user's media
 export async function GET(request: NextRequest) {
   try {
+    ensureSecret()
     await connectDB()
 
     const authHeader = request.headers.get('authorization')
@@ -18,7 +26,13 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.substring(7)
-    const payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }
+    let payload: { userId: string }
+    try {
+      payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }
+    } catch (err) {
+      console.warn('Invalid JWT in GET /api/media:', err?.message || err)
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
 
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') // 'photo' or 'video'
@@ -51,7 +65,13 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.substring(7)
-    const payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }
+    let payload: { userId: string }
+    try {
+      payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }
+    } catch (err) {
+      console.warn('Invalid JWT in POST /api/media:', err?.message || err)
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
 
     const formData = await request.formData()
     const file = formData.get('file') as File
@@ -126,7 +146,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     const token = authHeader.substring(7)
-    const payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }
+    let payload: { userId: string }
+    try {
+      payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }
+    } catch (err) {
+      console.warn('Invalid JWT in DELETE /api/media:', err?.message || err)
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
 
     const { searchParams } = new URL(request.url)
     const mediaId = searchParams.get('id')

@@ -29,6 +29,58 @@ export default function LoginPage() {
     }
   }
 
+  // Google sign-in flow (popup)
+  const handleGoogleSignIn = () => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+    if (!clientId) {
+      alert('Google Client ID not configured')
+      return
+    }
+
+    const redirectUri = `${window.location.origin}/google-oauth-callback.html`
+    const nonce = Math.random().toString(36).substring(2)
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'id_token',
+      scope: 'openid email profile',
+      prompt: 'select_account',
+      nonce,
+    })
+
+    const width = 500, height = 650
+    const left = window.screenX + (window.outerWidth - width) / 2
+    const top = window.screenY + (window.outerHeight - height) / 2
+    const popup = window.open(
+      `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+      'google_oauth',
+      `width=${width},height=${height},left=${left},top=${top}`
+    )
+
+    function messageListener(e: MessageEvent) {
+      if (e.origin !== window.location.origin) return
+      if (e.data?.type === 'google_oauth' && e.data.id_token) {
+        fetch('/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken: e.data.id_token }),
+        }).then(async (res) => {
+          const json = await res.json()
+          if (res.ok) {
+            localStorage.setItem('auth_token', json.token)
+            // trigger auth check by reloading or using auth context
+            window.location.href = '/dashboard'
+          } else {
+            alert(json.error || 'Google sign-in failed')
+          }
+        })
+      }
+      window.removeEventListener('message', messageListener)
+    }
+
+    window.addEventListener('message', messageListener)
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -114,6 +166,12 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          <div className="mt-4">
+            <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+              Sign in with Google
+            </Button>
+          </div>
 
           <div className="mt-6 text-center">
             <p className="text-foreground/60">

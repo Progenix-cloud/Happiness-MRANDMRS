@@ -48,7 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/auth/me')
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include',
+      })
       if (response.ok) {
         const userData = await response.json()
         setUser({
@@ -82,9 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...data.user,
         id: data.user._id || data.user.id,
       })
-      
-      // Store session
-      localStorage.setItem('auth_token', data.token)
+      // Session cookie will be set by server (HttpOnly cookie)
     } finally {
       setIsLoading(false)
     }
@@ -105,19 +105,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(result.error || 'Registration failed')
       }
 
-      if (result.requiresVerification) {
-        // Store temporary token for verification
-        localStorage.setItem('auth_token', result.token)
+      // Server sets HttpOnly verification cookie; client needn't store token
+      if (result.user) {
         setUser({
           ...result.user,
           id: result.user._id || result.user.id,
         })
-      } else {
-        setUser({
-          ...result.user,
-          id: result.user._id || result.user.id,
-        })
-        localStorage.setItem('auth_token', result.token)
       }
     } finally {
       setIsLoading(false)
@@ -126,13 +119,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setUser(null)
-    localStorage.removeItem('auth_token')
+    // Ask server to clear cookie
+    try {
+      fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    } catch (e) {
+      // ignore
+    }
   }
 
   const updateProfile = async (data: Partial<User>) => {
     const response = await fetch('/api/auth/me', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(data),
     })
 

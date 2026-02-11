@@ -77,13 +77,7 @@ export default function ContestantPage() {
 
   const fetchContestant = async () => {
     try {
-      const headers: Record<string, string> = {}
-      const token = localStorage.getItem('auth_token')
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-
-      const response = await fetch(`/api/contestants/${slug}`, { headers })
+      const response = await fetch(`/api/contestants/${slug}`, { credentials: 'include' })
       if (response.ok) {
         const data = await response.json()
         setContestant(data)
@@ -100,17 +94,11 @@ export default function ContestantPage() {
 
     setIsLiking(true)
     try {
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        alert('Please sign in to like')
-        return
-      }
-
       const response = await fetch('/api/votes', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           resourceType: 'contestant',

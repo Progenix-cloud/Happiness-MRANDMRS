@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer'
+import crypto from 'crypto'
 
-// Email configuration
+// Email configuration for nodemailer fallback
 const emailConfig = {
   host: process.env.EMAIL_HOST || 'smtp.gmail.com',
   port: parseInt(process.env.EMAIL_PORT || '587'),
@@ -11,12 +12,45 @@ const emailConfig = {
   },
 }
 
-// Create transporter
+// Create transporter (nodemailer fallback)
 const transporter = nodemailer.createTransport(emailConfig)
+
+// Helper to send email using either SendGrid (if configured) or nodemailer
+async function sendMail({ to, from, subject, html }: { to: string; from: string; subject: string; html: string }) {
+  const sendgridKey = process.env.SENDGRID_API_KEY
+  if (sendgridKey) {
+    try {
+      const sgMail = await import('@sendgrid/mail')
+      sgMail.default.setApiKey(sendgridKey)
+      await sgMail.default.send({ to, from, subject, html })
+      console.log(`✅ Email sent via SendGrid to ${to}`)
+      return true
+    } catch (error) {
+      console.error('❌ SendGrid send error:', error)
+      // fallthrough to nodemailer
+    }
+  }
+
+  try {
+    await transporter.sendMail({ from, to, subject, html })
+    console.log(`✅ Email sent via SMTP to ${to}`)
+    return true
+  } catch (error) {
+    console.error('❌ Failed to send email via SMTP:', error)
+    return false
+  }
+}
 
 // Generate 6-digit OTP
 export function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+  // Use a cryptographically secure RNG for OTPs
+  try {
+    const n = crypto.randomInt(100000, 1000000)
+    return n.toString()
+  } catch (e) {
+    // Fallback to Math.random only if crypto is not available (very unlikely in Node)
+    return Math.floor(100000 + Math.random() * 900000).toString()
+  }
 }
 
 // Send OTP email
@@ -63,14 +97,12 @@ export async function sendOTPEmail(email: string, otp: string, type: 'email_veri
   `
 
   try {
-    await transporter.sendMail({
+    return await sendMail({
       from: process.env.EMAIL_FROM || 'noreply@mr-miss-happiness.com',
       to: email,
       subject,
       html: htmlContent,
     })
-    console.log(`✅ OTP email sent to ${email}`)
-    return true
   } catch (error) {
     console.error('❌ Failed to send OTP email:', error)
     return false
@@ -129,14 +161,12 @@ export async function sendWelcomeEmail(email: string, name: string): Promise<boo
   `
 
   try {
-    await transporter.sendMail({
+    return await sendMail({
       from: process.env.EMAIL_FROM || 'noreply@mr-miss-happiness.com',
       to: email,
       subject: 'Welcome to Mr & Miss Happiness! 🎉',
       html: htmlContent,
     })
-    console.log(`✅ Welcome email sent to ${email}`)
-    return true
   } catch (error) {
     console.error('❌ Failed to send welcome email:', error)
     return false
@@ -208,14 +238,12 @@ export async function sendPaymentConfirmationEmail(
   `
 
   try {
-    await transporter.sendMail({
+    return await sendMail({
       from: process.env.EMAIL_FROM || 'noreply@mr-miss-happiness.com',
       to: email,
       subject: 'Payment Confirmed - Mr & Miss Happiness 🎉',
       html: htmlContent,
     })
-    console.log(`✅ Payment confirmation email sent to ${email}`)
-    return true
   } catch (error) {
     console.error('❌ Failed to send payment confirmation email:', error)
     return false
@@ -225,6 +253,11 @@ export async function sendPaymentConfirmationEmail(
 // Verify email configuration
 export async function verifyEmailConfig(): Promise<boolean> {
   try {
+    // If SendGrid is configured, assume it's ready; otherwise verify SMTP transporter
+    if (process.env.SENDGRID_API_KEY) {
+      console.log('✅ SendGrid detected')
+      return true
+    }
     await transporter.verify()
     console.log('✅ Email server is ready')
     return true

@@ -1,17 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { compare } from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
 import connectDB from '@/lib/mongodb'
-import { User } from '@/lib/models'
+import { User, Session } from '@/lib/models'
 
 const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || ''
+
+function ensureSecret() {
+  if (!NEXTAUTH_SECRET) {
+    console.error('NEXTAUTH_SECRET is not set')
+    throw new Error('NEXTAUTH_SECRET is not configured')
+  }
+}
 
 // POST /api/auth/login - User login
 export async function POST(request: NextRequest) {
   try {
+    ensureSecret()
     await connectDB()
 
-    const { email, password } = await request.json()
+    let body: any
+    try {
+      body = await request.json()
+    } catch (err) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
+
+    const { email, password } = body
 
     if (!email || !password) {
       return NextResponse.json(
@@ -38,22 +54,53 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate JWT token
+    // Generate JWT token and create a persistent session; set HttpOnly cookies
+    ensureSecret()
     const token = jwt.sign(
       { userId: user._id, email: user.email, roles: user.roles },
       NEXTAUTH_SECRET,
       { expiresIn: '7d' }
     )
 
-    // Return user without sensitive data
+    // Create long-lived session_id token to persist login across browser restarts (30 days)
+    const sessionId = crypto.randomBytes(32).toString('hex')
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+
+    await Session.create({
+      sessionId,
+      userId: user._id,
+      userAgent: request.headers.get('user-agent') || undefined,
+      ipAddress: request.headers.get('x-forwarded-for') || undefined,
+      expiresAt,
+    })
+
+    // Return user without sensitive data, set cookies
     const { password: _, ...userWithoutPassword } = user.toObject()
 
-    console.log(`✅ User logged in: ${email}`)
-
-    return NextResponse.json({
-      user: userWithoutPassword,
-      token,
+    const res = NextResponse.json({ user: userWithoutPassword })
+    // Short-lived JWT (compatibility)
+    res.cookies.set({
+      name: 'auth_token',
+      value: token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60,
     })
+    // Persistent session id
+    res.cookies.set({
+      name: 'session_id',
+      value: sessionId,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60,
+    })
+
+    console.log(`✅ User logged in: ${email}`)
+    return res
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(

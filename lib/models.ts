@@ -141,11 +141,10 @@ function slugifyName(name: string) {
     .replace(/^-+|-+$/g, '')
 }
 
-UserSchema.pre('save', function (next) {
+UserSchema.pre('save', async function () {
   if (!this.slug && this.name) {
     this.slug = slugifyName(this.name)
   }
-  next()
 })
 
 // OTP Schema

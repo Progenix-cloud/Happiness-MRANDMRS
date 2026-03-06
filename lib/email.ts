@@ -15,22 +15,8 @@ const emailConfig = {
 // Create transporter (nodemailer fallback)
 const transporter = nodemailer.createTransport(emailConfig)
 
-// Helper to send email using either SendGrid (if configured) or nodemailer
+// Helper to send email using nodemailer
 async function sendMail({ to, from, subject, html }: { to: string; from: string; subject: string; html: string }) {
-  const sendgridKey = process.env.SENDGRID_API_KEY
-  if (sendgridKey) {
-    try {
-      const sgMail = await import('@sendgrid/mail')
-      sgMail.default.setApiKey(sendgridKey)
-      await sgMail.default.send({ to, from, subject, html })
-      console.log(`✅ Email sent via SendGrid to ${to}`)
-      return true
-    } catch (error) {
-      console.error('❌ SendGrid send error:', error)
-      // fallthrough to nodemailer
-    }
-  }
-
   try {
     await transporter.sendMail({ from, to, subject, html })
     console.log(`✅ Email sent via SMTP to ${to}`)

@@ -112,6 +112,15 @@ export default function HomePage() {
         {/* Gradient overlay - Increasing visibility from left to right */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-transparent z-[1]" />
 
+        {/* Logo - Top Right */}
+        <div className="absolute top-6 right-6 md:top-8 md:right-10 z-20">
+          <img
+            src="/logomrms.png"
+            alt="Mr. & Miss Happiness"
+            className="w-28 h-28 md:w-44 md:h-44 object-contain drop-shadow-2xl"
+          />
+        </div>
+
         {/* Content - Left Side */}
         <div className="w-full max-w-xl ml-4 md:ml-12 lg:ml-20 mr-auto px-4 md:px-0 relative z-10">
             {/* Premium Badge */}
@@ -292,36 +301,49 @@ export default function HomePage() {
             {[
               {
                 id: 1,
+                imageUrl: '/mane1.jpeg',
+                dateLabel: '8 - 3 - 2026',
                 quote: 'Every moment of happiness is a celebration of life itself.',
               },
               {
                 id: 2,
+                imageUrl: '/mane2.jpeg',
+                dateLabel: undefined,
                 quote: 'Finding joy in simple moments is the key to true happiness.',
               },
               {
                 id: 3,
+                imageUrl: '/mane3.jpeg',
+                dateLabel: undefined,
                 quote: 'Happiness grows when shared with those around you.',
               },
               {
                 id: 4,
+                imageUrl: '/mane4.jpeg',
+                dateLabel: undefined,
                 quote: 'The greatest gift we can give ourselves is permission to be happy.',
               },
               {
                 id: 5,
+                imageUrl: '/mane1.jpeg',
+                dateLabel: undefined,
                 quote: 'True happiness comes from within, not from external achievements.',
               },
               {
                 id: 6,
+                imageUrl: '/mane2.jpeg',
+                dateLabel: undefined,
                 quote: 'Life is beautiful when you learn to celebrate every milestone.',
               },
             ].map((story, index) => (
               <InteractiveGalleryCard
                 key={story.id}
                 id={story.id}
-                imageUrl="/image.png"
+                imageUrl={story.imageUrl}
                 videoUrl="/miss.mp4"
                 quote={story.quote}
                 delay={index}
+                dateLabel={story.dateLabel}
               />
             ))}
           </div>
@@ -510,6 +532,9 @@ export default function HomePage() {
                 <span className="font-bold text-white group-hover:text-primary transition">Mr & Mrs Happiness</span>
               </div>
               <p className="text-white/60 text-sm leading-relaxed">Celebrating joy, community, and personal growth across all age groups.</p>
+              <Link href="/about" className="inline-block text-sm text-primary hover:text-secondary font-semibold transition">
+                About Us →
+              </Link>
             </div>
             <div className="space-y-4">
               <h4 className="font-bold text-white">Platform</h4>
@@ -537,9 +562,13 @@ export default function HomePage() {
             <div className="space-y-4">
               <h4 className="font-bold text-white">Community</h4>
               <ul className="space-y-2 text-white/70 text-sm">
-                <li><a href="#" className="hover:text-primary transition relative group">Twitter<span className="absolute bottom-0 left-0 w-0 h-px bg-primary group-hover:w-full transition-all duration-300" /></a></li>
-                <li><a href="#" className="hover:text-primary transition relative group">Instagram<span className="absolute bottom-0 left-0 w-0 h-px bg-primary group-hover:w-full transition-all duration-300" /></a></li>
-                <li><a href="#" className="hover:text-primary transition relative group">Contact<span className="absolute bottom-0 left-0 w-0 h-px bg-primary group-hover:w-full transition-all duration-300" /></a></li>
+                <li><a href="https://www.facebook.com/MrMissHappiness" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition relative group">Facebook<span className="absolute bottom-0 left-0 w-0 h-px bg-primary group-hover:w-full transition-all duration-300" /></a></li>
+                <li><a href="https://www.instagram.com/eohfoundation" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition relative group">Instagram<span className="absolute bottom-0 left-0 w-0 h-px bg-primary group-hover:w-full transition-all duration-300" /></a></li>
+                <li><a href="https://twitter.com/eohfoundation" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition relative group">Twitter<span className="absolute bottom-0 left-0 w-0 h-px bg-primary group-hover:w-full transition-all duration-300" /></a></li>
+                <li><a href="https://www.youtube.com/@eohfoundation" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition relative group">YouTube<span className="absolute bottom-0 left-0 w-0 h-px bg-primary group-hover:w-full transition-all duration-300" /></a></li>
+                <li><a href="https://www.pinterest.com/mrandMissHappiness" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition relative group">Pinterest<span className="absolute bottom-0 left-0 w-0 h-px bg-primary group-hover:w-full transition-all duration-300" /></a></li>
+                <li><a href="https://www.quora.com/profile/eohfoundation" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition relative group">Quora<span className="absolute bottom-0 left-0 w-0 h-px bg-primary group-hover:w-full transition-all duration-300" /></a></li>
+                <li><a href="mailto:nitin.arora@mrandmisshappiness.in" className="hover:text-primary transition relative group">Contact Us<span className="absolute bottom-0 left-0 w-0 h-px bg-primary group-hover:w-full transition-all duration-300" /></a></li>
               </ul>
             </div>
           </div>

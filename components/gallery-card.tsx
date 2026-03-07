@@ -9,6 +9,7 @@ interface GalleryCardProps {
   videoUrl?: string
   quote: string
   delay?: number
+  dateLabel?: string
 }
 
 export function InteractiveGalleryCard({ 
@@ -16,7 +17,8 @@ export function InteractiveGalleryCard({
   imageUrl = '/image.png', 
   videoUrl = '/miss.mp4',
   quote = 'Every moment of happiness is a celebration of life itself.',
-  delay = 0 
+  delay = 0,
+  dateLabel 
 }: GalleryCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -106,6 +108,13 @@ export function InteractiveGalleryCard({
 
           {/* Dark gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+          {/* Date label */}
+          {dateLabel && (
+            <div className="absolute top-3 left-3 z-10 px-3 py-1.5 bg-black/60 backdrop-blur-sm border border-primary/30 rounded-lg">
+              <p className="text-xs font-bold text-primary tracking-wider">{dateLabel}</p>
+            </div>
+          )}
 
           {/* Hover hint text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">

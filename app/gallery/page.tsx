@@ -9,6 +9,18 @@ import { Heart, Search, Filter, Share2, Eye, ArrowRight, User, Loader2 } from 'l
 import { GlassCard } from '@/components/glass-card'
 import { useAuth } from '@/lib/auth-context'
 
+interface MediaItem {
+  id: string
+  url: string
+  type: 'photo' | 'video'
+  caption: string
+  userId: string | null
+  userName: string
+  profileImage: string
+  createdAt: string
+}
+
+
 interface ContestantProfile {
   id: string
   userId: string
@@ -18,6 +30,10 @@ interface ContestantProfile {
   profileImage: string
   verifiedHappinessEntries: number
   galleryItemsCount: number
+  featuredMedia?: {
+    url: string
+    type: string
+  } | null
   likes: number
   views: number
   userHasVoted: boolean
@@ -29,10 +45,13 @@ export default function GalleryPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [contestants, setContestants] = useState<ContestantProfile[]>([])
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([])
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     fetchContestants()
+    fetchMediaItems()
   }, [])
 
   const fetchContestants = async () => {
@@ -48,6 +67,55 @@ export default function GalleryPage() {
       setIsLoading(false)
     }
   }
+
+  const fetchMediaItems = async () => {
+    try {
+      const response = await fetch('/api/gallery')
+      if (response.ok) {
+        const data = await response.json()
+        setMediaItems(data.media || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch gallery media:', error)
+    }
+  }
+
+  const photoItems = mediaItems.filter((item) => item.type === 'photo')
+  const videoItems = mediaItems.filter((item) => item.type === 'video')
+
+  const renderMediaCard = (item: MediaItem, index: number) => (
+    <GlassCard
+      key={item.id}
+      className="group overflow-hidden hover-lift cursor-pointer h-full"
+      animated
+      style={{ animationDelay: `${index * 0.05}s` }}
+      onClick={() => setSelectedMedia(item)}
+    >
+      <div className="relative overflow-hidden rounded-lg aspect-video bg-gradient-to-br from-primary/20 to-secondary/20">
+        {item.type === 'video' ? (
+          <video className="w-full h-full object-cover" muted loop playsInline src={item.url} />
+        ) : (
+          <img
+            src={item.url}
+            alt={item.caption || 'Gallery item'}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = '/placeholder-user.jpg'
+            }}
+          />
+        )}
+      </div>
+      <div className="p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <img src={item.profileImage} alt={item.userName} className="w-7 h-7 rounded-full object-cover" />
+          <p className="text-sm font-semibold">{item.userName}</p>
+        </div>
+        <p className="text-sm text-muted-foreground line-clamp-2">{item.caption || 'No caption yet'}</p>
+        <p className="text-xs text-muted-foreground mt-1">{new Date(item.createdAt).toLocaleDateString()}</p>
+      </div>
+    </GlassCard>
+  )
 
   const filteredItems = contestants.filter((item) => {
     const matchesSearch = item.shortBio.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -131,6 +199,76 @@ export default function GalleryPage() {
           ))}
         </div>
 
+        {/* Approved Media Grid */}
+        <section className="mb-10">
+          <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+            <Eye className="w-6 h-6 text-primary" />
+            Approved Gallery
+          </h2>
+
+          {mediaItems.length === 0 ? (
+            <Card>
+              <CardContent className="pt-8 pb-8 text-center">
+                <p className="text-muted-foreground">There are no approved media items yet.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {photoItems.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold mb-4">Photos</h3>
+                  <div className="grid md:grid-cols-3 gap-6">
+                    {photoItems.map((item, index) => renderMediaCard(item, index))}
+                  </div>
+                </div>
+              )}
+
+              {videoItems.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold mb-4">Videos</h3>
+                  <div className="grid md:grid-cols-3 gap-6">
+                    {videoItems.map((item, index) => renderMediaCard(item, index))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        {selectedMedia && (
+          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+            <div className="relative bg-card rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-xl">
+              <button
+                className="absolute top-3 right-3 z-20 rounded-full bg-white/90 p-2 hover:bg-white"
+                onClick={() => setSelectedMedia(null)}
+              >
+                ✕
+              </button>
+              <div className="p-4">
+                {selectedMedia.type === 'video' ? (
+                  <video
+                    className="w-full max-h-[70vh] rounded-lg bg-black"
+                    src={selectedMedia.url}
+                    controls
+                    autoPlay
+                    playsInline
+                  />
+                ) : (
+                  <img
+                    className="w-full max-h-[70vh] rounded-lg object-contain"
+                    src={selectedMedia.url}
+                    alt={selectedMedia.caption || 'Gallery photo'}
+                  />
+                )}
+                <div className="mt-3">
+                  <p className="text-sm font-semibold text-foreground">{selectedMedia.caption || 'No caption'}</p>
+                  <p className="text-xs text-muted-foreground mt-1">By {selectedMedia.userName}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Contestants Grid */}
         <section>
           <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
@@ -170,7 +308,7 @@ export default function GalleryPage() {
                     {/* Profile Image */}
                     <div className="relative overflow-hidden rounded-lg mb-4 aspect-square bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
                       <img
-                        src={profile.profileImage}
+                        src={profile.featuredMedia?.url || profile.profileImage}
                         alt={profile.userName}
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         onError={(e) => {
@@ -195,12 +333,18 @@ export default function GalleryPage() {
                       </div>
 
                       {/* Stats */}
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-4 gap-2">
                         <div className="bg-muted/50 p-2 rounded text-center">
                           <div className="text-lg font-bold text-primary">
                             {profile.verifiedHappinessEntries}
                           </div>
                           <div className="text-xs text-muted-foreground">Verified</div>
+                        </div>
+                        <div className="bg-muted/50 p-2 rounded text-center">
+                          <div className="text-lg font-bold text-primary">
+                            {profile.galleryItemsCount}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Gallery</div>
                         </div>
                         <div className="bg-muted/50 p-2 rounded text-center">
                           <div className="text-lg font-bold text-primary flex items-center justify-center gap-1">

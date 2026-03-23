@@ -58,6 +58,9 @@ export async function GET(request: NextRequest) {
           View.countDocuments({ resourceType: 'contestant', resourceId: userIdStr }),
         ])
 
+        // Get a featured verified media item for the public gallery preview
+        const featuredMedia = await Media.findOne({ userId: user._id, verified: true }).sort({ createdAt: -1 })
+
         // Check if current user has liked
         let userHasVoted = false
         if (currentUserId) {
@@ -79,6 +82,9 @@ export async function GET(request: NextRequest) {
           profileImage: user.profileImage || '/placeholder-user.jpg',
           verifiedHappinessEntries: entries,
           galleryItemsCount: mediaCount,
+          featuredMedia: featuredMedia
+            ? { url: featuredMedia.url, type: featuredMedia.type }
+            : null,
           likes: likeCount,
           views: viewCount,
           userHasVoted,

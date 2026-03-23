@@ -5,23 +5,38 @@ import { User, HappinessEntry, Media, Payment } from '@/lib/models'
 
 const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || ''
 
+function getTokenFromRequest(request: NextRequest): string | null {
+  const authHeader = request.headers.get('authorization')
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7)
+  }
+  const cookieToken = request.cookies.get('auth_token')
+  return cookieToken ? cookieToken.value : null
+}
+
+function getJwtPayload(request: NextRequest): { userId: string; roles?: string[] } {
+  const token = getTokenFromRequest(request)
+  if (!token) {
+    throw new Error('Unauthorized')
+  }
+  return jwt.verify(token, NEXTAUTH_SECRET) as { userId: string; roles?: string[] }
+}
+
+async function getAdminUser(request: NextRequest) {
+  const payload = getJwtPayload(request)
+  const user = await User.findById(payload.userId)
+  if (!user || !user.roles?.includes('admin')) {
+    throw new Error('Admin access required')
+  }
+  return user
+}
+
 // GET /api/users - Get all users (admin only)
 export async function GET(request: NextRequest) {
   try {
     await connectDB()
 
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string; roles?: string[] }
-
-    // Check if admin
-    if (!payload.roles?.includes('admin')) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
-    }
+    await getAdminUser(request)
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -67,13 +82,7 @@ export async function PUT(request: NextRequest) {
   try {
     await connectDB()
 
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string }
+    const payload = getJwtPayload(request)
 
     const { name, phone, bio, profileImage } = await request.json()
 
@@ -107,13 +116,7 @@ export async function GET_passport(request: NextRequest) {
   try {
     await connectDB()
 
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const payload = jwt.verify(token, NEXTAUTH_SECRET) as { userId: string; roles?: string[] }
+    const payload = getJwtPayload(request)
 
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId') || payload.userId

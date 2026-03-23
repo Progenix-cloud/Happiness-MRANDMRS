@@ -25,7 +25,7 @@ export default function DashboardGalleryPage() {
   const router = useRouter()
   const [isUploading, setIsUploading] = useState(false)
   const [caption, setCaption] = useState('')
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -52,51 +52,73 @@ export default function DashboardGalleryPage() {
   }, [user, fetchMedia])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0])
+    if (e.target.files) {
+      const files = Array.from(e.target.files)
+      if (files.length > 50) {
+        alert('You can upload up to 50 files at once')
+        return
+      }
+      setSelectedFiles(files)
+      if (!caption && files.length === 1) {
+        setCaption(files[0].name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '))
+      }
     }
   }
 
   const handleUpload = async () => {
-    if (!selectedFile || !caption) {
-      alert('Please select a file and add a caption')
+    if (selectedFiles.length === 0) {
+      alert('Please select at least one file')
       return
     }
-    
+
     setIsUploading(true)
     setUploadProgress(0)
 
-    const formData = new FormData()
-    formData.append('file', selectedFile)
-    formData.append('type', selectedFile.type.startsWith('video') ? 'video' : 'photo')
-    formData.append('caption', caption)
+    const successfulUploads: MediaItem[] = []
 
-    try {
-      const response = await fetch('/api/media', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-        body: formData,
-      })
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i]
+      const autoCaption = caption?.trim() 
+        ? `${caption.trim()} - ${file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')}`
+        : file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')
 
-      if (response.ok) {
-        const data = await response.json()
-        setMediaItems(prev => [data.media, ...prev])
-        setSelectedFile(null)
-        setCaption('')
-        alert('Media uploaded successfully!')
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Upload failed')
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('type', file.type.startsWith('video') ? 'video' : 'photo')
+      formData.append('caption', autoCaption)
+
+      try {
+        const response = await fetch('/api/media', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          },
+          body: formData,
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          successfulUploads.push(data.media)
+        } else {
+          const error = await response.json()
+          console.error('Upload failed for', file.name, error)
+        }
+      } catch (error) {
+        console.error('Upload error for', file.name, error)
+      } finally {
+        setUploadProgress(Math.round(((i + 1) / selectedFiles.length) * 100))
       }
-    } catch (error) {
-      console.error('Upload error:', error)
-      alert('Upload failed')
-    } finally {
-      setIsUploading(false)
-      setUploadProgress(0)
     }
+
+    if (successfulUploads.length > 0) {
+      setMediaItems(prev => [...successfulUploads, ...prev])
+      setCaption('')
+      setSelectedFiles([])
+      alert(`Uploaded ${successfulUploads.length} file${successfulUploads.length > 1 ? 's' : ''} successfully!`)
+    }
+
+    setIsUploading(false)
+    setUploadProgress(0)
   }
 
   const handleDelete = async (id: string) => {
@@ -156,14 +178,20 @@ export default function DashboardGalleryPage() {
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
               <div className="space-y-2 flex-1">
-                <Label htmlFor="file">Choose Photo or Video</Label>
+                <Label htmlFor="file">Choose Photo or Video (up to 50)</Label>
                 <Input
                   id="file"
                   type="file"
                   accept="image/*,video/*"
+                  multiple
                   onChange={handleFileSelect}
                   className="cursor-pointer"
                 />
+                {selectedFiles.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''} selected
+                  </p>
+                )}
               </div>
               <div className="space-y-2 flex-1">
                 <Label htmlFor="caption">Caption</Label>
@@ -171,13 +199,13 @@ export default function DashboardGalleryPage() {
                   id="caption"
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Describe your moment..."
+                  placeholder="Base caption (optional)"
                 />
               </div>
               <div className="flex items-end">
                 <Button 
                   onClick={handleUpload}
-                  disabled={isUploading || !selectedFile || !caption}
+                  disabled={isUploading || selectedFiles.length === 0}
                   className="bg-gradient-to-r from-primary to-secondary hover:shadow-lg"
                 >
                   {isUploading ? (
@@ -195,6 +223,14 @@ export default function DashboardGalleryPage() {
               </div>
             </div>
           </div>
+          {isUploading && (
+            <div className="mt-4">
+              <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                <div className="h-full bg-primary" style={{ width: `${uploadProgress}%` }} />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Uploading {uploadProgress}%</p>
+            </div>
+          )}
         </GlassCard>
 
         {/* Stats */}

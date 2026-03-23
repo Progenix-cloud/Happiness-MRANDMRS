@@ -259,6 +259,40 @@ ViewSchema.index({ createdAt: -1 })
 // SessionSchema.index({ sessionId: 1 }) -- already unique: true on schema
 SessionSchema.index({ userId: 1 })
 
+// Form lock schema (admin-only action toggles)
+export interface IFormLock extends Document {
+  key: string
+  name: string
+  description?: string
+  locked: boolean
+  updatedBy?: mongoose.Types.ObjectId
+  updatedAt: Date
+}
+
+const FormLockSchema = new Schema<IFormLock>({
+  key: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  description: { type: String },
+  locked: { type: Boolean, default: false },
+  updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+}, { timestamps: { createdAt: false, updatedAt: 'updatedAt' } })
+
+// Audit log for admin actions
+export interface IAdminLog extends Document {
+  actor: mongoose.Types.ObjectId
+  action: string
+  resourceType: 'user' | 'registration' | 'media' | 'formLock' | 'system'
+  message?: string
+  createdAt: Date
+}
+
+const AdminLogSchema = new Schema<IAdminLog>({
+  actor: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  action: { type: String, required: true },
+  resourceType: { type: String, enum: ['user', 'registration', 'media', 'formLock', 'system'], required: true },
+  message: { type: String },
+}, { timestamps: { createdAt: true, updatedAt: false } })
+
 // Models
 export const User: Model<IUser> = mongoose.models.User || mongoose.model<IUser>('User', UserSchema)
 export const OTP: Model<IOTP> = mongoose.models.OTP || mongoose.model<IOTP>('OTP', OTPSchema)
@@ -266,6 +300,8 @@ export const Payment: Model<IPayment> = mongoose.models.Payment || mongoose.mode
 export const HappinessEntry: Model<IHappinessEntry> = mongoose.models.HappinessEntry || mongoose.model<IHappinessEntry>('HappinessEntry', HappinessEntrySchema)
 export const Media: Model<IMedia> = mongoose.models.Media || mongoose.model<IMedia>('Media', MediaSchema)
 export const Registration: Model<IRegistration> = mongoose.models.Registration || mongoose.model<IRegistration>('Registration', RegistrationSchema)
+export const FormLock: Model<IFormLock> = mongoose.models.FormLock || mongoose.model<IFormLock>('FormLock', FormLockSchema)
+export const AdminLog: Model<IAdminLog> = mongoose.models.AdminLog || mongoose.model<IAdminLog>('AdminLog', AdminLogSchema)
 export const Vote: Model<IVote> = mongoose.models.Vote || mongoose.model<IVote>('Vote', VoteSchema)
 export const View: Model<IView> = mongoose.models.View || mongoose.model<IView>('View', ViewSchema)
 export const Session: Model<ISession> = mongoose.models.Session || mongoose.model<ISession>('Session', SessionSchema)
